@@ -1,15 +1,15 @@
 """
 JARVIS - Desktop AI Assistant with Streamlit HUD
-Dark Cyan Theme | Text-Based Control | OpenAI Integration
+Dark Cyan Theme | Cloud-Headless Safe | NVIDIA NIM Integration
 """
 import streamlit as st
 import os
-from openai import OpenAI
-from config import logger, OPENAI_API_KEY, MODEL, TEMPERATURE, MAX_TOKENS
-from config import PRIMARY_COLOR, SECONDARY_COLOR, ACCENT_COLOR, SUCCESS_COLOR, WARNING_COLOR
-from speech_module import VoiceInputSystem
-import pyautogui
+import json
 import time
+from config import logger, NVIDIA_API_KEY, PRIMARY_COLOR, SECONDARY_COLOR, ACCENT_COLOR, SUCCESS_COLOR, WARNING_COLOR, SAFE_MODE
+from speech_module import VoiceInputSystem
+from ai_parser import JarvisBrain
+from os_agent import OSAgent, IS_HEADLESS
 
 # Configure Streamlit page
 st.set_page_config(
@@ -69,10 +69,6 @@ st.markdown(f"""
         transform: scale(1.05);
     }}
     
-    .sidebar .sidebar-content {{
-        background-color: #0F1635;
-    }}
-    
     .message-box {{
         background-color: #1a1a2e;
         border: 1px solid {PRIMARY_COLOR};
@@ -90,30 +86,35 @@ st.markdown(f"""
         letter-spacing: 2px;
     }}
     </style>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True) #
 
 # Initialize session state
 if 'conversation_history' not in st.session_state:
     st.session_state.conversation_history = []
 if 'voice_system' not in st.session_state:
     st.session_state.voice_system = VoiceInputSystem()
-if 'client' not in st.session_state:
-    st.session_state.client = OpenAI(api_key=OPENAI_API_KEY)
+if 'brain' not in st.session_state:
+    st.session_state.brain = JarvisBrain()
+if 'executor' not in st.session_state:
+    st.session_state.executor = OSAgent()
 
 # Header with HUD styling
 st.markdown(f"""
     <div style="text-align: center; padding: 20px; border-bottom: 2px solid {PRIMARY_COLOR}; margin-bottom: 30px;">
         <h1 class="hud-title">🤖 J.A.R.V.I.S</h1>
         <p style="color: {PRIMARY_COLOR}; font-size: 12px; letter-spacing: 1px;">JUST ANOTHER REMARKABLE VOICE INTERFACE SYSTEM</p>
-        <p style="color: {WARNING_COLOR}; font-size: 11px;">TEXT MODE | PYTHON 3.14 COMPATIBLE | VOICE DISABLED</p>
+        <p style="color: {WARNING_COLOR}; font-size: 11px;">NVIDIA NIM DRIVEN | CLOUD ACCESSIBLE | DESKTOP CONTROL ENABLED</p>
     </div>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True) #
 
 # Layout: Main chat area + Sidebar
 col1, col2 = st.columns([3, 1])
 
 with col1:
-    st.markdown(f"<h2 style='color: {PRIMARY_COLOR}; margin-top: 0;'>💬 COMMAND INTERFACE</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='color: {PRIMARY_COLOR}; margin-top: 0;'>💬 COMMAND INTERFACE</h2>", unsafe_allow_html=True) #
+    
+    if IS_HEADLESS:
+        st.warning("🌐 Headless Cloud Environment Detected. Graphical actions will be simulated within the interface console below.")
     
     # Conversation display
     conversation_container = st.container()
@@ -125,11 +126,11 @@ with col1:
                 st.markdown(f"<div class='message-box' style='border-left: 4px solid {PRIMARY_COLOR};'><strong>JARVIS:</strong><br>{msg['content']}</div>", unsafe_allow_html=True)
     
     # Input section
-    st.markdown(f"<hr style='border-color: {PRIMARY_COLOR}; opacity: 0.3;'>", unsafe_allow_html=True)
+    st.markdown(f"<hr style='border-color: {PRIMARY_COLOR}; opacity: 0.3;'>", unsafe_allow_html=True) #
     
     user_input = st.text_input(
         "Enter Command:",
-        placeholder="Type your command here...",
+        placeholder="Type your command here (e.g., 'open google', 'launch notepad')...",
         key="command_input"
     )
     
@@ -138,27 +139,27 @@ with col1:
     with col_submit:
         if st.button("▶ EXECUTE", use_container_width=True):
             if user_input.strip():
-                # Add user message to history
                 st.session_state.conversation_history.append({"role": "user", "content": user_input})
                 logger.info(f"User input: {user_input}")
                 
                 try:
-                    # Call OpenAI API
-                    response = st.session_state.client.chat.completions.create(
-                        model=MODEL,
-                        messages=st.session_state.conversation_history,
-                        temperature=TEMPERATURE,
-                        max_tokens=MAX_TOKENS
-                    )
+                    # 1. Parse natural command to JSON
+                    parsed_intent = st.session_state.brain.parse_intent(user_input)
+                    action = parsed_intent.get("action", "unknown")
                     
-                    assistant_message = response.choices[0].message.content
-                    st.session_state.conversation_history.append({"role": "assistant", "content": assistant_message})
-                    logger.info(f"JARVIS response: {assistant_message}")
+                    if action == "unknown":
+                        response_msg = "Command intent could not be identified or flagged safety validation parameters."
+                    else:
+                        # 2. Execute via OS Engine (Headless Safe)
+                        success, detail_msg = st.session_state.executor.execute(parsed_intent)
+                        response_msg = f"Intent matches action type: **{action}**.\n\nResult details: {detail_msg}"
+                    
+                    st.session_state.conversation_history.append({"role": "assistant", "content": response_msg})
                     
                 except Exception as e:
                     error_msg = f"ERROR: {str(e)}"
                     st.session_state.conversation_history.append({"role": "assistant", "content": error_msg})
-                    logger.error(f"API Error: {str(e)}")
+                    logger.error(f"Execution Error: {str(e)}")
                 
                 st.rerun()
     
@@ -169,50 +170,42 @@ with col1:
 
 # Sidebar Control Panel
 with col2:
-    st.markdown(f"<h3 style='color: {PRIMARY_COLOR};'>⚙️ CONTROL PANEL</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color: {PRIMARY_COLOR};'>⚙️ CONTROL PANEL</h3>", unsafe_allow_html=True) #
     
-    st.markdown(f"<div class='message-box'><strong>Status:</strong><br><span style='color: {SUCCESS_COLOR};'>● ONLINE</span></div>", unsafe_allow_html=True)
+    status_label = "● SIMULATING" if IS_HEADLESS else "● ONLINE"
+    status_color = WARNING_COLOR if IS_HEADLESS else SUCCESS_COLOR
+    st.markdown(f"<div class='message-box'><strong>Status:</strong><br><span style='color: {status_color};'>{status_label}</span></div>", unsafe_allow_html=True) #
     
-    st.markdown(f"<div class='message-box'><strong>Mode:</strong><br><span style='color: {PRIMARY_COLOR};'>TEXT INPUT</span></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='message-box'><strong>System Mode:</strong><br><span style='color: {PRIMARY_COLOR};'>TEXT CONTROL</span></div>", unsafe_allow_html=True) #
     
-    st.markdown(f"<div class='message-box'><strong>Model:</strong><br><span style='color: {PRIMARY_COLOR};'>{MODEL}</span></div>", unsafe_allow_html=True)
-    
-    st.markdown(f"<div class='message-box'><strong>Messages:</strong><br><span style='color: {WARNING_COLOR};'>{len(st.session_state.conversation_history)}</span></div>", unsafe_allow_html=True)
-    
-    st.divider()
-    
-    st.markdown(f"<h4 style='color: {ACCENT_COLOR};'>📋 Quick Commands</h4>", unsafe_allow_html=True)
-    
-    if st.button("⌨️ Type 'Hello'"):
-        st.session_state.conversation_history.append({"role": "user", "content": "Hello, JARVIS!"})
-        st.rerun()
-    
-    if st.button("📁 Open Explorer"):
-        st.session_state.conversation_history.append({"role": "user", "content": "Open file explorer"})
-        st.rerun()
-    
-    if st.button("🔐 System Info"):
-        st.session_state.conversation_history.append({"role": "user", "content": "Show system information"})
-        st.rerun()
+    st.markdown(f"<div class='message-box'><strong>Parser:</strong><br><span style='color: {PRIMARY_COLOR};'>NVIDIA NIM Llama-3.1</span></div>", unsafe_allow_html=True)
     
     st.divider()
     
-    st.markdown(f"<h4 style='color: {WARNING_COLOR};'>⚠️ Voice Status</h4>", unsafe_allow_html=True)
-    st.markdown(f"<span style='color: {ACCENT_COLOR}; font-size: 12px;'>Voice control disabled for Python 3.14 compatibility. Use text input above.</span>", unsafe_allow_html=True)
+    st.markdown(f"<h4 style='color: {ACCENT_COLOR};'>📋 Quick Commands</h4>", unsafe_allow_html=True) #
+    
+    if st.button("📁 Open Website"):
+        st.session_state.conversation_history.append({"role": "user", "content": "open youtube.com"})
+        st.rerun()
+    
+    if st.button("💻 Search Python"):
+        st.session_state.conversation_history.append({"role": "user", "content": "Search google for python automation"})
+        st.rerun()
+    
+    if st.button("🗒️ Open Notepad"):
+        st.session_state.conversation_history.append({"role": "user", "content": "launch notepad"})
+        st.rerun()
     
     st.divider()
     
-    # Display API status
-    if OPENAI_API_KEY:
-        st.markdown(f"<span style='color: {SUCCESS_COLOR}; font-size: 11px;'>✓ API KEY CONFIGURED</span>", unsafe_allow_html=True)
+    if NVIDIA_API_KEY:
+        st.markdown(f"<span style='color: {SUCCESS_COLOR}; font-size: 11px;'>✓ NVIDIA KEY CONFIGURED</span>", unsafe_allow_html=True)
     else:
-        st.markdown(f"<span style='color: {ACCENT_COLOR}; font-size: 11px;'>✗ API KEY MISSING - Add OPENAI_API_KEY to .env</span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color: {ACCENT_COLOR}; font-size: 11px;'>✗ NVIDIA KEY MISSING - Add NVIDIA_API_KEY to .env</span>", unsafe_allow_html=True)
 
 # Footer
 st.markdown(f"""
     <div style="text-align: center; padding-top: 30px; border-top: 1px solid {PRIMARY_COLOR}; opacity: 0.5; font-size: 11px;">
-        JARVIS © 2026 | Python 3.14 | Streamlit | OpenAI GPT-4
+        JARVIS © 2026 | Python 3.14 | Streamlit | Nvidia Llama-3.1 NIM
     </div>
-""", unsafe_allow_html=True)
-
-logger.info("JARVIS app initialized successfully")
+""", unsafe_allow_html=True) #
