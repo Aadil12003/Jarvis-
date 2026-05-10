@@ -9,9 +9,12 @@ from config import NVIDIA_API_KEY, NVIDIA_API_BASE, NVIDIA_MODEL, logger
 
 class JarvisBrain:
     def __init__(self):
+        # Set a placeholder key if empty to prevent the OpenAI client from raising initialization credential exceptions
+        resolved_key = NVIDIA_API_KEY if NVIDIA_API_KEY else "dummy_key_unconfigured"
+        
         self.client = OpenAI(
             base_url=NVIDIA_API_BASE,
-            api_key=NVIDIA_API_KEY
+            api_key=resolved_key
         )
         
     def _get_system_prompt(self) -> str:
@@ -48,7 +51,7 @@ Do not return markdown or explanation text."""
 
     def parse_intent(self, user_command: str) -> dict:
         if not NVIDIA_API_KEY:
-            return {"action": "unknown", "params": {"text": "NVIDIA API Key not configured."}}
+            return {"action": "unknown", "params": {"text": "NVIDIA API Key not configured. Please add it to your Streamlit Cloud secrets."}}
             
         try:
             response = self.client.chat.completions.create(
