@@ -6,3 +6,4 @@ python-dotenv>=1.0.1
 psutil>=5.9.8
 pyperclip>=1.8.2
 pillow>=10.3.0
+streamlit-mic-recorder>=0.0.8
