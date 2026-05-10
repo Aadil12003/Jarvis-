@@ -1,8 +1,10 @@
 """
 Configuration and logging setup for JARVIS Assistant.
 """
+
 import logging
 import os
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -10,18 +12,19 @@ load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 # API Configuration
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 if not OPENAI_API_KEY:
     logger.warning("OPENAI_API_KEY not set. Please add it to your .env file.")
 
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
 # Model configuration
-MODEL = "gpt-4"
+MODEL = os.getenv("MODEL", "gpt-4")
 TEMPERATURE = 0.7
 MAX_TOKENS = 2000
 
